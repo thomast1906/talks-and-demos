@@ -1,15 +1,14 @@
-# Introduction 
+## Introduction 
 DevOps Notts - October 2020
+[Meetup](https://www.meetup.com/DevOps-Notts/events/273744740/)
 
-
-# Presentation & Demo
+## Presentation & Demo
 Deploying Terraform via Azure DevOps with some awesome features!
 
-# Presenters
+## Presenters
 Thomas Thornton & Gregor Suttie
 
-
-# Agenda
+## Agenda
 What is Terraform?
 - Quick Introduction of Terraform
 
@@ -31,10 +30,7 @@ Demos
 - DevOps Pipeline Triggers
 Build Validation 
 
-Questions!
-
-
-# Recommended Reading Resources
+## Recommended Reading Resources
 
 - [Deploy Terraform using Azure DevOps](https://thomasthornton.cloud/2020/07/08/deploy-terraform-using-azure-devops/)
 - [Validating Terraform Code During a Pull request in Azure DevOps](https://thomasthornton.cloud/2020/07/29/validating-terraform-code-during-a-pull-request-in-azure-devops/)
