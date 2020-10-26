@@ -8,6 +8,10 @@ Deploying Terraform via Azure DevOps with some awesome features!
 ## Presenters
 Thomas Thornton & Gregor Suttie
 
+## Slide Deck
+[PowerPoint](https://github.com/thomast1906/talks-and-demos/blob/main/Azure-Notts-DevOps/Azure%20NottsDevOps.pptx)
+[PDF](https://github.com/thomast1906/talks-and-demos/blob/main/Azure-Notts-DevOps/Azure%20NottsDevOps.pdf)
+
 ## Agenda
 What is Terraform?
 - Quick Introduction of Terraform
