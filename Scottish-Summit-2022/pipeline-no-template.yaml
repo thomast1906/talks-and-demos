@@ -1,0 +1,125 @@
+name: $(BuildDefinitionName)_$(date:yyyyMMdd)$(rev:.r)
+
+trigger:
+  batch: true
+  branches:
+    include:
+    - main
+
+variables:
+  - group: scottishsummit-app
+
+stages :
+  - stage: create_base_resources
+    jobs:
+      - job: "create_base_resources"
+        steps:
+          - task: AzureCLI@2
+            displayName: 'Deploy RG and ACR'
+            inputs:
+              azureSubscription: 'thomasthorntoncloud'
+              scriptType: bash
+              scriptLocation: inlineScript
+              addSpnToEnvironment: true
+              inlineScript: |
+                #!/bin/bash
+                RESOURCE_GROUP="scottishsummit-rg"
+                LOCATION="westeurope"
+                LOG_ANALYTICS_WORKSPACE="scottishsummitcontainersla"
+                ACR="scottishsummitcontainers"
+                az group create -l $LOCATION -n $RESOURCE_GROUP
+                az acr create -g $RESOURCE_GROUP -n $ACR --sku basic --admin-enabled true
+                az monitor log-analytics workspace create -g $RESOURCE_GROUP --workspace-name $LOG_ANALYTICS_WORKSPACE
+          - task: AzureCLI@2
+            displayName: 'Deploy Log Analytics'
+            inputs:
+              azureSubscription: 'thomasthorntoncloud'
+              scriptType: bash
+              scriptLocation: inlineScript
+              addSpnToEnvironment: true
+              inlineScript: |
+                #!/bin/bash
+                RESOURCE_GROUP="scottishsummit-rg"
+                LOG_ANALYTICS_WORKSPACE="scottishsummitcontainersla"
+                az monitor log-analytics workspace create -g $RESOURCE_GROUP --workspace-name $LOG_ANALYTICS_WORKSPACE
+
+  - stage: Build
+    dependsOn: [create_base_resources]
+    displayName: Build sample app
+    jobs:  
+    - job: Build
+      displayName: Build job
+      steps:
+      - task: Docker@2
+        displayName: Build and push sample app to container registry
+        inputs:
+          command: buildAndPush
+          repository: 'sampleapp'
+          dockerfile: '$(Build.SourcesDirectory)/aspnet-core-dotnet-core/Dockerfile'
+          containerRegistry: 'scottishsummitcontainers'
+          tags: '$(Build.BuildId)'
+
+  - stage: create_container_environment
+    dependsOn: [Build]
+    jobs:
+      - job: "deploy_app"
+        steps:
+          - task: AzureCLI@2
+            displayName: 'Create container app environment'
+            inputs:
+              azureSubscription: 'thomasthorntoncloud'
+              scriptType: bash
+              scriptLocation: inlineScript
+              addSpnToEnvironment: true
+              inlineScript: |
+                #!/bin/bash
+                az config set extension.use_dynamic_install=yes_without_prompt
+                az provider register --namespace Microsoft.App
+                RESOURCE_GROUP="scottishsummit-rg"
+                LOCATION="westeurope"
+                LOG_ANALYTICS_WORKSPACE="scottishsummitcontainersla"
+                CONTAINERAPPS_ENVIRONMENT="scottishsummit-environment"
+                LOG_ANALYTICS_WORKSPACE_CLIENT_ID=`az monitor log-analytics workspace show --query customerId -g $RESOURCE_GROUP -n $LOG_ANALYTICS_WORKSPACE -o tsv | tr -d '[:space:]'`
+                LOG_ANALYTICS_WORKSPACE_CLIENT_SECRET=`az monitor log-analytics workspace get-shared-keys --query primarySharedKey -g $RESOURCE_GROUP -n $LOG_ANALYTICS_WORKSPACE -o tsv | tr -d '[:space:]'`
+                az containerapp env create \
+                -n $CONTAINERAPPS_ENVIRONMENT \
+                -g $RESOURCE_GROUP \
+                --logs-workspace-id $LOG_ANALYTICS_WORKSPACE_CLIENT_ID \
+                --logs-workspace-key $LOG_ANALYTICS_WORKSPACE_CLIENT_SECRET \
+                -l $LOCATION
+
+  - stage: deploy_container_app
+    dependsOn: [create_container_environment]
+    jobs:
+      - job: "deploy_app"
+        steps:
+          - task: AzureCLI@2
+            displayName: 'Deploy app to Container App'
+            inputs:
+              azureSubscription: 'thomasthorntoncloud'
+              scriptType: bash
+              scriptLocation: inlineScript
+              addSpnToEnvironment: true
+              inlineScript: |
+                #!/bin/bash
+                az config set extension.use_dynamic_install=yes_without_prompt
+                az provider register --namespace Microsoft.App
+                RESOURCE_GROUP="scottishsummit-rg"
+                LOG_ANALYTICS_WORKSPACE="scottishsummitcontainersla"
+                CONTAINERAPPS_ENVIRONMENT="scottishsummit-environment"
+                az containerapp update \
+                  --name scottishsummitapp \
+                  --resource-group $RESOURCE_GROUP \
+                  --image scottishsummitcontainers.azurecr.io/sampleapp:'$(Build.BuildId)'
+                # az containerapp create \
+                #   --name scottishsummitapp \
+                #   --resource-group $RESOURCE_GROUP \
+                #   --environment $CONTAINERAPPS_ENVIRONMENT \
+                #   --image scottishsummitcontainers.azurecr.io/sampleapp:'$(Build.BuildId)' \
+                #   --min-replicas 2 \
+                #   --max-replicas 2 \
+                #   --registry-server scottishsummitcontainers.azurecr.io \
+                #   --registry-username scottishsummitcontainers \
+                #   --registry-password $(acrpassword) \
+                #   --target-port 80 \
+                #   --ingress 'external'

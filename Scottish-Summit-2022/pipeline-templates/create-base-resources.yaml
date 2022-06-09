@@ -1,0 +1,42 @@
+
+parameters:
+  RESOURCE_GROUP: ''
+  LOCATION: ''
+  LOG_ANALYTICS_WORKSPACE: ''
+  ACR: ''
+  azureSubscription: ''
+
+steps:
+- task: AzureCLI@2
+  displayName: 'Deploy RG and ACR'
+  inputs:
+    azureSubscription: ${{ parameters.azureSubscription }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    addSpnToEnvironment: true
+    inlineScript: |
+      #!/bin/bash
+
+      RESOURCE_GROUP=${{ parameters.RESOURCE_GROUP }}
+      LOCATION=${{ parameters.LOCATION }}
+      LOG_ANALYTICS_WORKSPACE=${{ parameters.LOG_ANALYTICS_WORKSPACE }}
+      ACR=${{ parameters.ACR }}
+
+      az group create -l $LOCATION -n $RESOURCE_GROUP
+      az acr create -g $RESOURCE_GROUP -n $ACR --sku basic --admin-enabled true
+      az monitor log-analytics workspace create -g $RESOURCE_GROUP --workspace-name $LOG_ANALYTICS_WORKSPACE
+
+- task: AzureCLI@2
+  displayName: 'Deploy Log Analytics'
+  inputs:
+    azureSubscription: ${{ parameters.azureSubscription }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    addSpnToEnvironment: true
+    inlineScript: |
+      #!/bin/bash
+
+      RESOURCE_GROUP=${{ parameters.RESOURCE_GROUP }}
+      LOG_ANALYTICS_WORKSPACE=${{ parameters.LOG_ANALYTICS_WORKSPACE }}
+
+      az monitor log-analytics workspace create -g $RESOURCE_GROUP --workspace-name $LOG_ANALYTICS_WORKSPACE

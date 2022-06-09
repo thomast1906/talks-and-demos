@@ -1,0 +1,42 @@
+
+parameters:
+  RESOURCE_GROUP: ''
+  LOG_ANALYTICS_WORKSPACE: ''
+  CONTAINERAPPS_ENVIRONMENT: ''
+  CONTAINERREGISTRY: ''
+  CONTAINERAPP: ''
+
+steps:
+- task: AzureCLI@2
+  displayName: 'Deploy app to Container App'
+  inputs:
+    azureSubscription: 'thomasthorntoncloud'
+    scriptType: bash
+    scriptLocation: inlineScript
+    addSpnToEnvironment: true
+    inlineScript: |
+      #!/bin/bash
+      az config set extension.use_dynamic_install=yes_without_prompt
+      az provider register --namespace Microsoft.App
+
+      RESOURCE_GROUP=${{ parameters.RESOURCE_GROUP }}
+      LOG_ANALYTICS_WORKSPACE=${{ parameters.LOG_ANALYTICS_WORKSPACE }}
+      CONTAINERAPPS_ENVIRONMENT=${{ parameters.CONTAINERAPPS_ENVIRONMENT }}
+      CONTAINERREGISTRY=${{ parameters.CONTAINERREGISTRY }}
+      CONTAINERAPP=${{ parameters.CONTAINERAPPS_ENVIRONMENT }}
+
+      LOG_ANALYTICS_WORKSPACE_CLIENT_ID=`az monitor log-analytics workspace show --query customerId -g $RESOURCE_GROUP -n $LOG_ANALYTICS_WORKSPACE -o tsv | tr -d '[:space:]'`
+      LOG_ANALYTICS_WORKSPACE_CLIENT_SECRET=`az monitor log-analytics workspace get-shared-keys --query primarySharedKey -g $RESOURCE_GROUP -n $LOG_ANALYTICS_WORKSPACE -o tsv | tr -d '[:space:]'`
+      
+      az containerapp create \
+        --name $CONTAINERAPP \
+        --resource-group $RESOURCE_GROUP \
+        --environment $CONTAINERAPPS_ENVIRONMENT \
+        --image $CONTAINERREGISTRY.azurecr.io/sampleapp:'$(Build.BuildId)' \
+        --min-replicas 2 \
+        --max-replicas 2 \
+        --registry-server $CONTAINERREGISTRY.azurecr.io \
+        --registry-username $CONTAINERREGISTRY \
+        --registry-password $(acrpassword) \
+        --target-port 80 \
+        --ingress 'external'
