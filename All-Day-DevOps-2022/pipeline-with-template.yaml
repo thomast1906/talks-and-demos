@@ -1,0 +1,94 @@
+name: $(BuildDefinitionName)_$(date:yyyyMMdd)$(rev:.r)
+
+trigger:
+  batch: true
+  branches:
+    include:
+    - main
+
+parameters:
+- name: appName
+  default: alldaydevops2022
+  values:
+  - alldaydevops2022
+  - alldaydevops20222
+  - alldaydevops20223
+
+variables:
+  - group: ${{ parameters.appName }}-app
+  - name: RESOURCE_GROUP
+    value: "${{ parameters.appName }}-rg"
+  - name: LOCATION
+    value: westeurope
+  - name: LOG_ANALYTICS_WORKSPACE
+    value: "${{ parameters.appName }}containersla"
+  - name: ACR
+    value: "${{ parameters.appName }}containers"
+  - name: azureSubscription
+    value: "thomasthorntoncloud"
+  - name: REPOSITORY
+    value: "sampleapp"
+  - name: TAGS
+    value: '$(Build.BuildId)'
+  - name: DOCKERFILE
+    value: "$(Build.SourcesDirectory)/aspnet-core-dotnet-core/Dockerfile"
+  - name: CONTAINERREGISTRY
+    value: "${{ parameters.appName }}containers"
+  - name: CONTAINERAPPS_ENVIRONMENT
+    value: "${{ parameters.appName }}-environment"
+  - name: CONTAINERAPP
+    value: "${{ parameters.appName }}app"
+
+stages :
+  - stage: create_base_resources
+    jobs:
+      - job: "create_base_resources"
+        steps:
+          - template: pipeline-templates/create-base-resources.yaml
+            parameters:
+              RESOURCE_GROUP: ${{ variables.RESOURCE_GROUP }}
+              LOCATION: ${{ variables.LOCATION }}
+              LOG_ANALYTICS_WORKSPACE: ${{ variables.LOG_ANALYTICS_WORKSPACE }}
+              ACR: ${{ variables.ACR }}
+              azureSubscription: ${{ variables.azureSubscription }}
+
+  - stage: Build
+    dependsOn: [create_base_resources]
+    condition: succeeded('create_base_resources')
+    displayName: Build sample app
+    jobs:  
+    - job: "Build"
+      steps:
+        - template: pipeline-templates/build-app.yaml
+          parameters:
+            REPOSITORY: ${{ variables.REPOSITORY }}
+            DOCKERFILE: ${{ variables.DOCKERFILE }}
+            CONTAINERREGISTRY: ${{ variables.CONTAINERREGISTRY }}
+            TAGS: ${{ variables.TAGS }}
+
+  - stage: create_container_environment
+    dependsOn: [Build]
+    condition: succeeded('Build')
+    jobs:
+      - job: "deploy_app"
+        steps:
+          - template: pipeline-templates/create-containerapp-environment.yaml
+            parameters:
+              RESOURCE_GROUP: ${{ variables.RESOURCE_GROUP }}
+              LOCATION: ${{ variables.LOCATION }}
+              LOG_ANALYTICS_WORKSPACE: ${{ variables.LOG_ANALYTICS_WORKSPACE }}
+              CONTAINERAPPS_ENVIRONMENT: ${{ variables.CONTAINERAPPS_ENVIRONMENT }}
+
+  - stage: deploy_container_app
+    dependsOn: [create_container_environment]
+    condition: succeeded('create_container_environment')
+    jobs:
+      - job: "deploy_app"
+        steps:
+          - template: pipeline-templates/create-containerapp.yaml
+            parameters:
+              RESOURCE_GROUP: ${{ variables.RESOURCE_GROUP }}
+              LOG_ANALYTICS_WORKSPACE: ${{ variables.LOG_ANALYTICS_WORKSPACE }}
+              CONTAINERAPPS_ENVIRONMENT: ${{ variables.CONTAINERAPPS_ENVIRONMENT }}
+              CONTAINERREGISTRY: ${{ variables.CONTAINERREGISTRY }}
+              CONTAINERAPP: ${{ variables.CONTAINERREGISTRY }}
