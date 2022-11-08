@@ -1,0 +1,33 @@
+parameters:
+  RESOURCE_GROUP: ''
+  LOCATION: ''
+  LOG_ANALYTICS_WORKSPACE: ''
+  CONTAINERAPPS_ENVIRONMENT: ''
+
+steps:
+- task: AzureCLI@2
+  displayName: 'Create container app environment'
+  inputs:
+    azureSubscription: 'thomasthorntoncloud'
+    scriptType: bash
+    scriptLocation: inlineScript
+    addSpnToEnvironment: true
+    inlineScript: |
+      #!/bin/bash
+      az config set extension.use_dynamic_install=yes_without_prompt
+      az provider register --namespace Microsoft.App
+
+      RESOURCE_GROUP=${{ parameters.RESOURCE_GROUP }}
+      LOCATION=${{ parameters.LOCATION }}
+      LOG_ANALYTICS_WORKSPACE=${{ parameters.LOG_ANALYTICS_WORKSPACE }}
+      CONTAINERAPPS_ENVIRONMENT=${{ parameters.CONTAINERAPPS_ENVIRONMENT }}
+
+      LOG_ANALYTICS_WORKSPACE_CLIENT_ID=`az monitor log-analytics workspace show --query customerId -g $RESOURCE_GROUP -n $LOG_ANALYTICS_WORKSPACE -o tsv | tr -d '[:space:]'`
+      LOG_ANALYTICS_WORKSPACE_CLIENT_SECRET=`az monitor log-analytics workspace get-shared-keys --query primarySharedKey -g $RESOURCE_GROUP -n $LOG_ANALYTICS_WORKSPACE -o tsv | tr -d '[:space:]'`
+      
+      az containerapp env create \
+      -n $CONTAINERAPPS_ENVIRONMENT \
+      -g $RESOURCE_GROUP \
+      --logs-workspace-id $LOG_ANALYTICS_WORKSPACE_CLIENT_ID \
+      --logs-workspace-key $LOG_ANALYTICS_WORKSPACE_CLIENT_SECRET \
+      -l $LOCATION

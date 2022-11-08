@@ -1,0 +1,15 @@
+parameters:
+  REPOSITORY: ''
+  DOCKERFILE: ''
+  CONTAINERREGISTRY: ''
+  TAGS: ''
+
+steps:
+- task: Docker@2
+  displayName: Build and push sample app to container registry
+  inputs:
+    command: buildAndPush
+    repository: ${{ parameters.REPOSITORY }}
+    dockerfile: ${{ parameters.DOCKERFILE }}
+    containerRegistry: ${{ parameters.CONTAINERREGISTRY }}
+    tags: ${{ parameters.TAGS }}
